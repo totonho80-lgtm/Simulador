@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Investimento — Imóvel na Planta x Aplicação Financeira</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --surface-2:      #ffffff;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6; /* Imóvel na Planta */
+    --series-2:       #eb6834; /* Aplicação Financeira */
+    --good:           #006300;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page-plane);
+    color: var(--text-primary);
+  }
+  .app { max-width: 1180px; margin: 0 auto; padding: 24px 20px 64px; }
+  header.top {
+    padding: 28px 32px;
+    background: linear-gradient(135deg, #17395e, #2a78d6);
+    color: #fff;
+    border-radius: 14px;
+    margin-bottom: 24px;
+  }
+  header.top h1 { margin: 0 0 6px; font-size: 22px; font-weight: 700; }
+  header.top p { margin: 0; font-size: 13.5px; opacity: 0.9; max-width: 720px; line-height: 1.5; }
+  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .panel-form { position: sticky; top: 20px; }
+  .panel-form h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); margin: 18px 0 10px; }
+  .panel-form h2:first-of-type { margin-top: 0; }
+  label { display: block; font-size: 12.5px; color: var(--text-secondary); margin: 10px 0 4px; }
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--gridline);
+    border-radius: 8px;
+    font-size: 13.5px;
+    background: #fff;
+    color: var(--text-primary);
+  }
+  input:focus { outline: 2px solid var(--series-1); outline-offset: 1px; }
+  .field-suffix { position: relative; }
+  .field-suffix span {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 12px; color: var(--text-muted); pointer-events: none;
+  }
+  .field-suffix input { padding-right: 34px; }
+  button.primary {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px 16px;
+    background: var(--series-1);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.primary:hover { background: #1c5cab; }
+  button.secondary {
+    padding: 11px 18px;
+    background: #fff;
+    color: var(--series-1);
+    border: 1.5px solid var(--series-1);
+    border-radius: 9px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary:hover { background: #eef4fc; }
+  .hint { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+  .toggle-group { display: inline-flex; border: 1px solid var(--gridline); border-radius: 8px; overflow: hidden; }
+  .toggle-btn { padding: 6px 16px; font-size: 12.5px; font-weight: 600; background: #fff; border: none; cursor: pointer; color: var(--text-secondary); }
+  .toggle-btn.active { background: var(--series-1); color: #fff; }
+  .toggle-btn + .toggle-btn { border-left: 1px solid var(--gridline); }
+  .fin-inputs label { display: block; font-size: 12.5px; color: var(--text-secondary); margin: 10px 0 4px; }
+  .fin-inputs input[type="number"] { width: 100%; padding: 8px 10px; border: 1px solid var(--gridline); border-radius: 8px; font-size: 13.5px; background: #fff; color: var(--text-primary); }
+  .results { display: flex; flex-direction: column; gap: 18px; }
+  .results[hidden] { display: none; }
+  .empty-state {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 320px; color: var(--text-muted); font-size: 14px; text-align: center;
+    border: 1.5px dashed var(--gridline); border-radius: 12px; padding: 40px;
+  }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+  .stat-group h3 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+  .stat-group.imovel h3 { color: var(--series-1); }
+  .stat-group.aplicacao h3 { color: var(--series-2); }
+  .stat-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--gridline); font-size: 13.5px; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .label { color: var(--text-secondary); }
+  .stat-row .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  table.compare { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.compare th, table.compare td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; }
+  table.compare th:first-child, table.compare td:first-child { text-align: left; font-variant-numeric: initial; }
+  table.compare thead th { color: var(--text-secondary); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .02em; }
+  table.compare thead th.imovel-col { color: var(--series-1); }
+  table.compare thead th.aplicacao-col { color: var(--series-2); }
+  .advantage-banner {
+    background: #eaf5ec;
+    border: 1px solid #bfe3c4;
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+  }
+  .advantage-banner .big { font-size: 22px; font-weight: 700; color: var(--good); font-variant-numeric: tabular-nums; }
+  .advantage-banner .desc { font-size: 13px; color: var(--text-secondary); max-width: 480px; }
+  .chart-box { position: relative; height: 280px; }
+  .legend-row { display: flex; gap: 18px; font-size: 12.5px; color: var(--text-secondary); margin-top: 10px; justify-content: center; }
+  .legend-row .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+  .table-scroll { max-height: 420px; overflow: auto; border: 1px solid var(--gridline); border-radius: 10px; }
+  table.detail { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.detail th, table.detail td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--gridline); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  table.detail th:first-child, table.detail td:first-child { text-align: center; font-variant-numeric: initial; }
+  table.detail thead th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-secondary); font-weight: 600; z-index: 1; }
+  table.detail tbody tr.balao-row { background: #fdf4ec; }
+  .section-title { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+  .section-sub { font-size: 12.5px; color: var(--text-muted); margin: 0 0 14px; }
+  .footer-actions { display: flex; justify-content: flex-end; gap: 10px; }
+  .disclaimer { font-size: 11px; color: var(--text-muted); line-height: 1.5; border-top: 1px solid var(--gridline); padding-top: 14px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <h1>Simulador de Investimento — Imóvel na Planta x Aplicação Financeira</h1>
+    <p>Compare o retorno de comprar um imóvel na planta (parcelas corrigidas pelo INCC) contra deixar o mesmo capital rendendo em uma aplicação financeira. Ajuste as premissas ao lado e gere um relatório em PDF personalizado para o investidor.</p>
+  </header>
+
+  <div class="layout">
+
+    <aside class="panel-form card">
+      <h2>Dados do Cliente</h2>
+      <label for="nomeCliente">Nome do Cliente / Investidor</label>
+      <input type="text" id="nomeCliente" placeholder="Ex.: João da Silva">
+
+      <h2>Imóvel na Planta</h2>
+      <label for="valorImovel">Valor do imóvel na planta (R$)</label>
+      <input type="number" id="valorImovel" value="480000" min="0" step="1000">
+
+      <label for="pctEntrada">Entrada</label>
+      <div class="field-suffix"><input type="number" id="pctEntrada" value="10" min="0" max="100" step="0.1"><span>%</span></div>
+
+      <label for="parcelaMensal">Parcela mensal base (R$)</label>
+      <input type="number" id="parcelaMensal" value="2000" min="0" step="50">
+
+      <label for="prazoMeses">Prazo de entrega (meses)</label>
+      <input type="number" id="prazoMeses" value="36" min="1" step="1">
+
+      <label for="negociacaoSaldoDevedor">Saldo devedor negociado (% do valor do imóvel)</label>
+      <div class="field-suffix"><input type="number" id="negociacaoSaldoDevedor" value="40" min="0" max="100" step="1"><span>%</span></div>
+      <p class="hint">Base usada para calcular os balões semestrais: saldo devedor menos o total já coberto pelas parcelas mensais, dividido pelo número de balões do prazo.</p>
+
+      <label for="inccAno">INCC — correção anual (%)</label>
+      <div class="field-suffix"><input type="number" id="inccAno" value="6" min="0" step="0.1"><span>% a.a.</span></div>
+      <p class="hint">Aplicado pró-rata ao mês nas parcelas e a cada 6 meses nos balões.</p>
+
+      <label for="valorizacaoMes">Valorização média do imóvel (% ao mês)</label>
+      <div class="field-suffix"><input type="number" id="valorizacaoMes" value="1.8" min="0" step="0.05"><span>% a.m.</span></div>
+      <p class="hint" id="valorizacaoPreview">= 64,80% de valorização ao final de 36 meses.</p>
+
+      <h2>Aplicação Financeira (cenário alternativo)</h2>
+      <label for="rendimentoAplicacao">Rendimento bruto da aplicação</label>
+      <div class="field-suffix"><input type="number" id="rendimentoAplicacao" value="16" min="0" step="0.1"><span>% a.a.</span></div>
+      <p class="hint">O aporte inicial é igual à entrada do imóvel; os aportes mensais seguem o mesmo fluxo das parcelas (já corrigidas pelo INCC). IR regressivo (22,5% a 15%) aplicado conforme o tempo de cada aporte até o resgate final.</p>
+
+      <button class="primary" id="btnCalcular">Calcular Simulação</button>
+    </aside>
+
+    <main id="resultsPanel" class="results" hidden>
+
+      <section class="card">
+        <p class="section-title">Resumo Executivo</p>
+        <p class="section-sub" id="resumoCliente"></p>
+        <div class="grid-2">
+          <div class="stat-group imovel">
+            <h3>Imóvel na Planta</h3>
+            <div class="stat-row"><span class="label">Valor do imóvel na planta</span><span class="value" id="rValorImovel"></span></div>
+            <div class="stat-row"><span class="label">Entrada</span><span class="value" id="rEntrada"></span></div>
+            <div class="stat-row"><span class="label">Parcela mensal (1ª parcela)</span><span class="value" id="rParcela"></span></div>
+            <div class="stat-row"><span class="label">Prazo de entrega</span><span class="value" id="rPrazo"></span></div>
+          </div>
+          <div class="stat-group aplicacao">
+            <h3>Aplicação Financeira</h3>
+            <div class="stat-row"><span class="label">Aporte inicial</span><span class="value" id="rAporteInicial"></span></div>
+            <div class="stat-row"><span class="label">Total aportado no período</span><span class="value" id="rTotalAportado"></span></div>
+            <div class="stat-row"><span class="label">Rendimento mensal bruto</span><span class="value" id="rRendMensal"></span></div>
+            <div class="stat-row"><span class="label">Saldo final na aplicação</span><span class="value" id="rSaldoFinal"></span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <p class="section-title">Comparativo de Resultados ao Final do Prazo</p>
+        <p class="section-sub">Mesmo capital total investido nos dois cenários.</p>
+        <table class="compare">
+          <thead>
+            <tr><th>Indicador</th><th class="imovel-col">Imóvel na Planta</th><th class="aplicacao-col">Aplicação Financeira</th></tr>
+          </thead>
+          <tbody id="compareBody"></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <p class="section-title">Correção Monetária (INCC)</p>
+        <p class="section-sub">Efeito da correção do INCC sobre o saldo devedor negociado e sobre o total investido no imóvel ao longo do prazo de obra.</p>
+        <div class="grid-3">
+          <div class="stat-group imovel">
+            <h3>Saldo Devedor Negociado</h3>
+            <div class="stat-row"><span class="label">Valor nominal (sem correção)</span><span class="value" id="rSaldoDevedorNominal"></span></div>
+            <div class="stat-row"><span class="label">Corrigido pelo INCC ao final do prazo</span><span class="value" id="rSaldoDevedorCorrigido"></span></div>
+          </div>
+          <div class="stat-group imovel">
+            <h3>Total Investido no Imóvel</h3>
+            <div class="stat-row"><span class="label">Valor nominal (sem correção)</span><span class="value" id="rTotalInvestidoNominal"></span></div>
+            <div class="stat-row"><span class="label">Corrigido pelo INCC (fluxo real, mês a mês)</span><span class="value" id="rTotalInvestidoCorrigido"></span></div>
+            <div class="stat-row"><span class="label">Corrigido pelo INCC (todas as parcelas, incl. a 1ª)</span><span class="value" id="rTotalPagoEntradaINCC"></span></div>
+          </div>
+          <div class="stat-group imovel">
+            <h3>Valor do Imóvel a Quitar</h3>
+            <div class="stat-row"><span class="label">Valor nominal (sem correção)</span><span class="value" id="rValorAQuitar"></span></div>
+            <div class="stat-row"><span class="label">Corrigido pelo INCC ao final do prazo</span><span class="value" id="rValorAQuitarCorrigido"></span></div>
+          </div>
+        </div>
+        <p class="hint" style="margin-top:12px;">"Valor a quitar" é a parte do preço do imóvel não coberta pela entrada, parcelas e balões desta simulação — normalmente liquidada na entrega (ex.: financiamento bancário), por isso também sofre a correção do INCC até lá. Sobre o total investido: o "fluxo real, mês a mês" reflete o que de fato é pago mês a mês (a 1ª parcela sai no valor base, já que ainda não passou tempo para render correção, e o reajuste vai se acumulando a partir da 2ª); já o valor "com todas as parcelas corrigidas, incl. a 1ª" projeta o saldo devedor inteiro corrigido pelo INCC ao longo de todo o prazo, como se a correção já estivesse presente desde a primeira parcela.</p>
+      </section>
+
+      <section class="advantage-banner">
+        <div>
+          <div class="desc">Vantagem do imóvel na planta sobre a aplicação financeira</div>
+          <div class="big" id="vantagemRS"></div>
+        </div>
+        <div class="big" id="vantagemPct"></div>
+      </section>
+
+      <section class="card grid-2">
+        <div>
+          <p class="section-title" style="font-size:13px">Comparativo Financeiro (R$)</p>
+          <div class="chart-box"><canvas id="chartRS"></canvas></div>
+        </div>
+        <div>
+          <p class="section-title" style="font-size:13px">ROI Comparado (%)</p>
+          <div class="chart-box"><canvas id="chartROI"></canvas></div>
+        </div>
+      </section>
+
+      <section class="card" id="warningBanner" hidden style="background:#fdf1e8; border:1px solid #f3cca4;">
+        <p class="section-title" style="color:#9a4a12; font-size:13.5px; margin-bottom:4px;">⚠ Atenção às premissas</p>
+        <p class="section-sub" style="color:#7a4319; margin-bottom:0;">Com os valores informados, o total das parcelas mensais já cobre (ou ultrapassa) o saldo devedor negociado, então o balão semestral calculado ficou negativo (um "desconto" em vez de um pagamento extra). Revise o percentual de saldo devedor negociado, o valor da parcela mensal ou o prazo antes de apresentar este cenário ao investidor.</p>
+      </section>
+
+      <section class="card">
+        <p class="section-title">Fluxo de Pagamento Mês a Mês — Imóvel na Planta</p>
+        <p class="section-sub">Parcela corrigida pelo INCC mês a mês (estimativa). Linhas destacadas indicam meses com balão semestral.</p>
+        <div class="table-scroll">
+          <table class="detail">
+            <thead><tr><th>Mês</th><th>Parcela corrigida (R$)</th><th>Balão (R$)</th><th>Total do mês (R$)</th><th>Acumulado (R$)</th></tr></thead>
+            <tbody id="fluxoBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <p class="section-title">Simulação Mês a Mês — Aplicação Financeira</p>
+        <p class="section-sub">Aportes equivalentes ao fluxo de parcelas do imóvel, rendendo no cenário alternativo (IR regressivo).</p>
+        <div class="table-scroll">
+          <table class="detail">
+            <thead><tr><th>Mês</th><th>Saldo Anterior (R$)</th><th>Aporte (R$)</th><th>Rendimento (R$)</th><th>Alíquota IR</th><th>Desconto IR (R$)</th><th>Saldo Final (R$)</th></tr></thead>
+            <tbody id="simBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" id="financiamentoSection">
+        <p class="section-title">Financiamento do Saldo Devedor na Entrega — PRICE x SAC</p>
+        <p class="section-sub">Simula o financiamento bancário do valor a quitar na entrega do imóvel (corrigido pelo INCC), comparando os dois sistemas de amortização mais usados no Brasil.</p>
+
+        <div class="grid-2" style="margin-bottom: 18px;">
+          <div class="stat-group imovel">
+            <h3>Valores puxados da simulação acima</h3>
+            <div class="stat-row"><span class="label">Entrada (corrigida pelo INCC, todas as parcelas)</span><span class="value" id="rFinEntrada"></span></div>
+            <div class="stat-row"><span class="label">Valor do imóvel (entrada + saldo a quitar corrigido)</span><span class="value" id="rFinValorImovel"></span></div>
+            <div class="stat-row"><span class="label">Valor a financiar (saldo devedor na entrega)</span><span class="value" id="rFinPrincipal"></span></div>
+          </div>
+          <div class="fin-inputs">
+            <label for="finPrazoMeses">Prazo do financiamento (meses)</label>
+            <input type="number" id="finPrazoMeses" value="360" min="1" step="1">
+            <label for="finTaxaMensal">Taxa de juros do financiamento</label>
+            <div class="field-suffix"><input type="number" id="finTaxaMensal" value="1" min="0" step="0.01"><span>% a.m.</span></div>
+            <button class="primary" id="btnCalcularFinanciamento" style="margin-top: 14px;">Calcular Financiamento</button>
+            <p class="hint" id="finWarning" style="color: #9a4a12;"></p>
+          </div>
+        </div>
+
+        <div id="finResultados" hidden>
+          <table class="compare" style="margin-bottom: 18px;">
+            <thead><tr><th>Indicador</th><th class="imovel-col">PRICE</th><th class="aplicacao-col">SAC</th></tr></thead>
+            <tbody id="finCompareBody"></tbody>
+          </table>
+
+          <div class="chart-box" style="margin-bottom: 18px;"><canvas id="chartFinanciamento"></canvas></div>
+
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap;">
+            <span class="section-title" style="font-size: 13px; margin: 0;">Tabela de Amortização Detalhada</span>
+            <div class="toggle-group">
+              <button class="toggle-btn active" id="btnTogglePrice">PRICE</button>
+              <button class="toggle-btn" id="btnToggleSac">SAC</button>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table class="detail">
+              <thead><tr><th>Mês</th><th>Saldo Devedor (R$)</th><th>Juros (R$)</th><th>Amortização (R$)</th><th>Parcela (R$)</th></tr></thead>
+              <tbody id="finDetailBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="footer-actions">
+          <button class="secondary" id="btnPdf">Baixar PDF do Relatório</button>
+        </div>
+        <p class="disclaimer">Simulação ilustrativa baseada nas premissas informadas (INCC, valorização do imóvel, rendimento e alíquotas de IR). Não constitui recomendação de investimento. Rentabilidades passadas não garantem resultados futuros; consulte um profissional habilitado antes de decidir. Todos os cálculos são executados localmente no seu navegador — nenhum dado é enviado a servidores externos.</p>
+      </section>
+
+    </main>
+
+    <div id="emptyState" class="empty-state">Preencha as premissas ao lado e clique em <strong>&nbsp;"Calcular Simulação"&nbsp;</strong> para ver o comparativo completo.</div>
+
+  </div>
+</div>
+
+<script>
+/* ===================== ENGINE DE CÁLCULO ===================== */
+function calcularSimulacao(p) {
+  const inccMensal = (p.inccAnoPct / 12) / 100;
+  const inccSemestral = (p.inccAnoPct / 2) / 100;
+  const valorEntrada = p.valorImovel * (p.pctEntrada / 100);
+  const saldoDevedor = p.valorImovel * (p.negociacaoSaldoDevedorPct / 100) - valorEntrada;
+  const totalParcelasBase = p.parcelaMensal * p.prazoMeses;
+  const saldoDevedorRestante = saldoDevedor - totalParcelasBase;
+  const numBaloes = Math.floor(p.prazoMeses / 6);
+  const balaoSemestralBase = numBaloes > 0 ? saldoDevedorRestante / numBaloes : 0;
+
+  const parcelas = new Array(p.prazoMeses + 1);
+  parcelas[0] = { mes: 'Entrada', parcela: valorEntrada, balao: 0, total: valorEntrada, acumulado: valorEntrada };
+  let lastBalao = null;
+  for (let mes = 1; mes <= p.prazoMeses; mes++) {
+    const parcela = mes === 1 ? p.parcelaMensal : parcelas[mes - 1].parcela * (1 + inccMensal);
+    let balao = 0;
+    if (numBaloes > 0 && mes % 6 === 0) {
+      balao = lastBalao === null ? balaoSemestralBase * (1 + inccSemestral) : lastBalao * (1 + inccSemestral);
+      lastBalao = balao;
+    }
+    const total = parcela + balao;
+    const acumulado = parcelas[mes - 1].acumulado + total;
+    parcelas[mes] = { mes, parcela, balao, total, acumulado };
+  }
+  const valorAplicadoTotal = parcelas[p.prazoMeses].acumulado;
+
+  const rendimentoMensal = (p.rendimentoAplicacaoAnoPct / 100) / 12;
+  const sim = new Array(p.prazoMeses + 1);
+  sim[0] = { mes: 0, saldoAnterior: 0, aporte: valorEntrada, rendimento: 0, aliquota: 0, descontoIR: 0, saldoFinal: valorEntrada };
+  for (let mes = 1; mes <= p.prazoMeses; mes++) {
+    const saldoAnterior = sim[mes - 1].saldoFinal;
+    const aporte = parcelas[mes].total;
+    const saldoAporte = saldoAnterior + aporte;
+    const rendimento = saldoAporte * rendimentoMensal;
+    const mesesRestantes = p.prazoMeses - (mes - 1);
+    let aliquota;
+    if (mesesRestantes <= 6) aliquota = 0.225;
+    else if (mesesRestantes <= 12) aliquota = 0.20;
+    else if (mesesRestantes <= 24) aliquota = 0.175;
+    else aliquota = 0.15;
+    const descontoIR = rendimento * aliquota;
+    const saldoFinal = saldoAporte + rendimento;
+    sim[mes] = { mes, saldoAnterior, aporte, rendimento, aliquota, descontoIR, saldoFinal };
+  }
+  const saldoFinalAplicacao = sim[p.prazoMeses].saldoFinal;
+  const totalDescontoIR = sim.reduce((s, r) => s + r.descontoIR, 0);
+  const saldoAoSacar = saldoFinalAplicacao - totalDescontoIR;
+  const lucroOperacaoFinanceira = saldoAoSacar - valorAplicadoTotal;
+  const roiTotalAplicacao = lucroOperacaoFinanceira / valorAplicadoTotal;
+  const roiMensalAplicacao = roiTotalAplicacao / p.prazoMeses;
+  const roiAnualAplicacao = roiMensalAplicacao * 12;
+
+  const valorizacaoFinalPct = p.valorizacaoMesPct * p.prazoMeses;
+  const valorImovelMercado = p.valorImovel * (1 + valorizacaoFinalPct / 100);
+  const valorAQuitar = p.valorImovel - valorEntrada - saldoDevedor;
+  const valorImovelQuitarINCC = valorAQuitar * Math.pow(1 + inccMensal, p.prazoMeses);
+  const saldoDevedorCorrigidoINCC = saldoDevedor * Math.pow(1 + inccMensal, p.prazoMeses);
+  const valorPagoEntradaINCC = saldoDevedorCorrigidoINCC + valorEntrada;
+  const lucroImovelTotal = valorImovelMercado - valorImovelQuitarINCC - valorPagoEntradaINCC;
+  const totalInvestidoNominal = valorEntrada + saldoDevedor;
+  const capitalInvestidoImovel = valorAplicadoTotal;
+  const roiTotalImovel = lucroImovelTotal / capitalInvestidoImovel;
+  const roiMensalImovel = roiTotalImovel / p.prazoMeses;
+  const roiAnualImovel = roiMensalImovel * 12;
+
+  const diferencaRS = lucroImovelTotal - lucroOperacaoFinanceira;
+  const vantagemPct = diferencaRS / lucroOperacaoFinanceira;
+
+  return {
+    params: p, valorEntrada, saldoDevedor, balaoSemestralBase, numBaloes,
+    parcelas, sim, valorAplicadoTotal, saldoFinalAplicacao, totalDescontoIR, saldoAoSacar,
+    lucroOperacaoFinanceira, roiTotalAplicacao, roiAnualAplicacao,
+    valorizacaoFinalPct, valorImovelMercado, lucroImovelTotal, roiTotalImovel, roiAnualImovel,
+    capitalInvestidoImovel, diferencaRS, vantagemPct,
+    saldoDevedorCorrigidoINCC, totalInvestidoNominal, valorAQuitar, valorImovelQuitarINCC, valorPagoEntradaINCC
+  };
+}
+
+/* ===================== FORMATAÇÃO ===================== */
+const fmtRS = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 });
+const fmtRSShort = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 });
+const fmtPct = v => (v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 }) + '%';
+
+let ultimoResultado = null;
+let chartRS = null, chartROI = null;
+
+function lerParametros() {
+  return {
+    nomeCliente: document.getElementById('nomeCliente').value.trim(),
+    valorImovel: parseFloat(document.getElementById('valorImovel').value) || 0,
+    pctEntrada: parseFloat(document.getElementById('pctEntrada').value) || 0,
+    parcelaMensal: parseFloat(document.getElementById('parcelaMensal').value) || 0,
+    prazoMeses: Math.max(1, parseInt(document.getElementById('prazoMeses').value) || 1),
+    negociacaoSaldoDevedorPct: parseFloat(document.getElementById('negociacaoSaldoDevedor').value) || 0,
+    inccAnoPct: parseFloat(document.getElementById('inccAno').value) || 0,
+    valorizacaoMesPct: parseFloat(document.getElementById('valorizacaoMes').value) || 0,
+    rendimentoAplicacaoAnoPct: parseFloat(document.getElementById('rendimentoAplicacao').value) || 0
+  };
+}
+
+function atualizarPreviewValorizacao() {
+  const valorizacaoMesPct = parseFloat(document.getElementById('valorizacaoMes').value) || 0;
+  const prazoMeses = Math.max(1, parseInt(document.getElementById('prazoMeses').value) || 1);
+  const totalPct = valorizacaoMesPct * prazoMeses;
+  document.getElementById('valorizacaoPreview').textContent =
+    `= ${totalPct.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}% de valorização ao final de ${prazoMeses} meses.`;
+}
+document.getElementById('valorizacaoMes').addEventListener('input', atualizarPreviewValorizacao);
+document.getElementById('prazoMeses').addEventListener('input', atualizarPreviewValorizacao);
+
+function renderResultados(r) {
+  document.getElementById('emptyState').setAttribute('hidden', 'hidden');
+  document.getElementById('resultsPanel').removeAttribute('hidden');
+
+  document.getElementById('resumoCliente').textContent = r.params.nomeCliente
+    ? `Simulação preparada para: ${r.params.nomeCliente} — gerada em ${new Date().toLocaleDateString('pt-BR')}`
+    : `Gerada em ${new Date().toLocaleDateString('pt-BR')}`;
+
+  const warningBanner = document.getElementById('warningBanner');
+  if (r.numBaloes > 0 && r.balaoSemestralBase < 0) {
+    warningBanner.removeAttribute('hidden');
+  } else {
+    warningBanner.setAttribute('hidden', 'hidden');
+  }
+
+  document.getElementById('rValorImovel').textContent = fmtRS(r.params.valorImovel);
+  document.getElementById('rEntrada').textContent = fmtRS(r.valorEntrada);
+  document.getElementById('rParcela').textContent = fmtRS(r.params.parcelaMensal);
+  document.getElementById('rPrazo').textContent = r.params.prazoMeses + ' meses';
+
+  document.getElementById('rSaldoDevedorNominal').textContent = fmtRS(r.saldoDevedor);
+  document.getElementById('rSaldoDevedorCorrigido').textContent = fmtRS(r.saldoDevedorCorrigidoINCC);
+  document.getElementById('rTotalInvestidoNominal').textContent = fmtRS(r.totalInvestidoNominal);
+  document.getElementById('rTotalInvestidoCorrigido').textContent = fmtRS(r.valorAplicadoTotal);
+  document.getElementById('rTotalPagoEntradaINCC').textContent = fmtRS(r.valorPagoEntradaINCC);
+  document.getElementById('rValorAQuitar').textContent = fmtRS(r.valorAQuitar);
+  document.getElementById('rValorAQuitarCorrigido').textContent = fmtRS(r.valorImovelQuitarINCC);
+
+  document.getElementById('rAporteInicial').textContent = fmtRS(r.valorEntrada);
+  document.getElementById('rTotalAportado').textContent = fmtRS(r.valorAplicadoTotal);
+  document.getElementById('rRendMensal').textContent = fmtPct(r.params.rendimentoAplicacaoAnoPct / 100 / 12);
+  document.getElementById('rSaldoFinal').textContent = fmtRS(r.saldoFinalAplicacao);
+
+  document.getElementById('compareBody').innerHTML = `
+    <tr><td>Capital Total Investido</td><td>${fmtRS(r.capitalInvestidoImovel)}</td><td>${fmtRS(r.valorAplicadoTotal)}</td></tr>
+    <tr><td>Valor Final do Ativo</td><td>${fmtRS(r.valorImovelMercado)}</td><td>${fmtRS(r.saldoFinalAplicacao)}</td></tr>
+    <tr><td>Lucro Líquido</td><td>${fmtRS(r.lucroImovelTotal)}</td><td>${fmtRS(r.lucroOperacaoFinanceira)}</td></tr>
+    <tr><td>ROI Total</td><td>${fmtPct(r.roiTotalImovel)}</td><td>${fmtPct(r.roiTotalAplicacao)}</td></tr>
+    <tr><td>ROI Anual</td><td>${fmtPct(r.roiAnualImovel)}</td><td>${fmtPct(r.roiAnualAplicacao)}</td></tr>
+  `;
+
+  document.getElementById('vantagemRS').textContent = fmtRS(r.diferencaRS);
+  document.getElementById('vantagemPct').textContent = fmtPct(r.vantagemPct) + ' de vantagem';
+
+  let fluxoHtml = '';
+  for (const row of r.parcelas) {
+    const temBalao = row.balao && Math.abs(row.balao) > 0.005;
+    fluxoHtml += `<tr class="${temBalao ? 'balao-row' : ''}"><td>${row.mes}</td><td>${fmtRS(row.parcela)}</td><td>${temBalao ? fmtRS(row.balao) : '—'}</td><td>${fmtRS(row.total)}</td><td>${fmtRS(row.acumulado)}</td></tr>`;
+  }
+  document.getElementById('fluxoBody').innerHTML = fluxoHtml;
+
+  let simHtml = '';
+  for (const row of r.sim) {
+    simHtml += `<tr><td>${row.mes}</td><td>${fmtRS(row.saldoAnterior)}</td><td>${fmtRS(row.aporte)}</td><td>${fmtRS(row.rendimento)}</td><td>${fmtPct(row.aliquota)}</td><td>${fmtRS(row.descontoIR)}</td><td>${fmtRS(row.saldoFinal)}</td></tr>`;
+  }
+  document.getElementById('simBody').innerHTML = simHtml;
+
+  renderCharts(r);
+  atualizarValoresFinanciamento(r);
+}
+
+/* ===================== FINANCIAMENTO DO SALDO — PRICE x SAC ===================== */
+let ultimoFinanciamento = null;
+let sistemaFinanciamentoAtivo = 'PRICE';
+let chartFinanciamento = null;
+
+function atualizarValoresFinanciamento(r) {
+  const entrada = r.valorPagoEntradaINCC;
+  const valorImovel = r.valorImovelQuitarINCC + r.valorPagoEntradaINCC;
+  const principal = valorImovel - entrada;
+  document.getElementById('rFinEntrada').textContent = fmtRS(entrada);
+  document.getElementById('rFinValorImovel').textContent = fmtRS(valorImovel);
+  document.getElementById('rFinPrincipal').textContent = fmtRS(principal);
+}
+
+function calcularAmortizacao(principal, taxaMensalPct, prazoMeses, sistema) {
+  const i = taxaMensalPct / 100;
+  const tabela = new Array(prazoMeses + 1);
+  tabela[0] = { mes: 0, saldoDevedor: principal, juros: 0, amortizacao: 0, parcela: 0 };
+
+  if (sistema === 'PRICE') {
+    const pmt = i === 0 ? principal / prazoMeses : (principal * i) / (1 - Math.pow(1 + i, -prazoMeses));
+    let saldo = principal;
+    for (let mes = 1; mes <= prazoMeses; mes++) {
+      const juros = saldo * i;
+      let amortizacao = pmt - juros;
+      saldo = saldo - amortizacao;
+      if (mes === prazoMeses) { amortizacao += saldo; saldo = 0; } // zera resíduo de arredondamento
+      tabela[mes] = { mes, saldoDevedor: Math.max(saldo, 0), juros, amortizacao, parcela: pmt };
+    }
+  } else {
+    const amortConstante = principal / prazoMeses;
+    let saldo = principal;
+    for (let mes = 1; mes <= prazoMeses; mes++) {
+      const juros = saldo * i;
+      const parcela = amortConstante + juros;
+      saldo = saldo - amortConstante;
+      tabela[mes] = { mes, saldoDevedor: Math.max(saldo, 0), juros, amortizacao: amortConstante, parcela };
+    }
+  }
+
+  const totalPago = tabela.slice(1).reduce((s, row) => s + row.parcela, 0);
+  const totalJuros = tabela.slice(1).reduce((s, row) => s + row.juros, 0);
+  return { tabela, totalPago, totalJuros, parcelaInicial: tabela[1].parcela, parcelaFinal: tabela[prazoMeses].parcela };
+}
+
+function renderFinanciamento(f) {
+  document.getElementById('finResultados').removeAttribute('hidden');
+
+  document.getElementById('finCompareBody').innerHTML = `
+    <tr><td>Parcela inicial</td><td>${fmtRS(f.price.parcelaInicial)}</td><td>${fmtRS(f.sac.parcelaInicial)}</td></tr>
+    <tr><td>Parcela final</td><td>${fmtRS(f.price.parcelaFinal)}</td><td>${fmtRS(f.sac.parcelaFinal)}</td></tr>
+    <tr><td>Total pago (juros + amortização)</td><td>${fmtRS(f.price.totalPago)}</td><td>${fmtRS(f.sac.totalPago)}</td></tr>
+    <tr><td>Total de juros pago</td><td>${fmtRS(f.price.totalJuros)}</td><td>${fmtRS(f.sac.totalJuros)}</td></tr>
+  `;
+
+  renderFinanciamentoChart(f);
+  renderFinanciamentoTabela(f, sistemaFinanciamentoAtivo);
+}
+
+function renderFinanciamentoChart(f) {
+  if (chartFinanciamento) chartFinanciamento.destroy();
+  const ctx = document.getElementById('chartFinanciamento').getContext('2d');
+  const labels = f.price.tabela.slice(1).map(row => row.mes);
+  chartFinanciamento = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'PRICE (parcela fixa)', data: f.price.tabela.slice(1).map(row => row.parcela), borderColor: '#2a78d6', backgroundColor: '#2a78d6', pointRadius: 0, borderWidth: 2, tension: 0 },
+        { label: 'SAC (parcela decrescente)', data: f.sac.tabela.slice(1).map(row => row.parcela), borderColor: '#eb6834', backgroundColor: '#eb6834', pointRadius: 0, borderWidth: 2, tension: 0 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11.5 } } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtRS(c.raw) } }
+      },
+      scales: {
+        y: { grid: { color: '#e1e0d9' }, ticks: { callback: v => fmtRSShort(v), color: '#898781', font: { size: 10.5 } } },
+        x: { grid: { display: false }, ticks: { color: '#52514e', font: { size: 10 }, maxTicksLimit: 12 }, title: { display: true, text: 'Mês do financiamento', color: '#898781', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderFinanciamentoTabela(f, sistema) {
+  const dados = sistema === 'PRICE' ? f.price.tabela : f.sac.tabela;
+  let html = '';
+  for (const row of dados) {
+    html += `<tr><td>${row.mes}</td><td>${fmtRS(row.saldoDevedor)}</td><td>${fmtRS(row.juros)}</td><td>${fmtRS(row.amortizacao)}</td><td>${fmtRS(row.parcela)}</td></tr>`;
+  }
+  document.getElementById('finDetailBody').innerHTML = html;
+}
+
+document.getElementById('btnCalcularFinanciamento').addEventListener('click', () => {
+  const finWarning = document.getElementById('finWarning');
+  if (!ultimoResultado) {
+    finWarning.textContent = 'Calcule a simulação do imóvel na planta (acima) primeiro — o financiamento usa os valores dela.';
+    return;
+  }
+  finWarning.textContent = '';
+
+  const entrada = ultimoResultado.valorPagoEntradaINCC;
+  const valorImovel = ultimoResultado.valorImovelQuitarINCC + ultimoResultado.valorPagoEntradaINCC;
+  const principal = valorImovel - entrada;
+  const prazoMeses = Math.max(1, parseInt(document.getElementById('finPrazoMeses').value) || 1);
+  const taxaMensal = parseFloat(document.getElementById('finTaxaMensal').value) || 0;
+
+  const price = calcularAmortizacao(principal, taxaMensal, prazoMeses, 'PRICE');
+  const sac = calcularAmortizacao(principal, taxaMensal, prazoMeses, 'SAC');
+
+  ultimoFinanciamento = { entrada, valorImovel, principal, prazoMeses, taxaMensal, price, sac };
+  renderFinanciamento(ultimoFinanciamento);
+});
+
+document.getElementById('btnTogglePrice').addEventListener('click', () => {
+  sistemaFinanciamentoAtivo = 'PRICE';
+  document.getElementById('btnTogglePrice').classList.add('active');
+  document.getElementById('btnToggleSac').classList.remove('active');
+  if (ultimoFinanciamento) renderFinanciamentoTabela(ultimoFinanciamento, 'PRICE');
+});
+document.getElementById('btnToggleSac').addEventListener('click', () => {
+  sistemaFinanciamentoAtivo = 'SAC';
+  document.getElementById('btnToggleSac').classList.add('active');
+  document.getElementById('btnTogglePrice').classList.remove('active');
+  if (ultimoFinanciamento) renderFinanciamentoTabela(ultimoFinanciamento, 'SAC');
+});
+
+const valueLabelPlugin = {
+  id: 'valueLabelPlugin',
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+    const numCategories = chart.data.labels.length;
+    for (let i = 0; i < numCategories; i++) {
+      // Collect this category's bar tops across datasets to detect near-equal heights
+      const entries = chart.data.datasets.map((ds, di) => {
+        const meta = chart.getDatasetMeta(di);
+        const bar = meta.data[i];
+        const val = ds.data[i];
+        return bar && val !== undefined && val !== null ? { bar, val, ds } : null;
+      }).filter(Boolean);
+      // Sort by bar top (smallest y = tallest bar) so stacking order is consistent
+      entries.sort((a, b) => a.bar.y - b.bar.y);
+      let lastY = null;
+      entries.forEach(({ bar, val, ds }) => {
+        let drawY = bar.y - 6;
+        if (lastY !== null && drawY - lastY < 13) drawY = lastY + 13;
+        lastY = drawY;
+        ctx.save();
+        ctx.fillStyle = '#52514e';
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(ds.labelFmt ? ds.labelFmt(val) : val, bar.x, drawY);
+        ctx.restore();
+      });
+    }
+  }
+};
+
+function renderCharts(r) {
+  if (chartRS) chartRS.destroy();
+  if (chartROI) chartROI.destroy();
+
+  const ctxRS = document.getElementById('chartRS').getContext('2d');
+  chartRS = new Chart(ctxRS, {
+    type: 'bar',
+    data: {
+      labels: ['Capital Investido', 'Valor Final do Ativo', 'Lucro Líquido'],
+      datasets: [
+        { label: 'Imóvel na Planta', data: [r.capitalInvestidoImovel, r.valorImovelMercado, r.lucroImovelTotal], backgroundColor: '#2a78d6', borderRadius: 4, maxBarThickness: 42, labelFmt: v => fmtRSShort(v) },
+        { label: 'Aplicação Financeira', data: [r.valorAplicadoTotal, r.saldoFinalAplicacao, r.lucroOperacaoFinanceira], backgroundColor: '#eb6834', borderRadius: 4, maxBarThickness: 42, labelFmt: v => fmtRSShort(v) }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11.5 } } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtRS(c.raw) } } },
+      scales: {
+        y: { grid: { color: '#e1e0d9' }, ticks: { callback: v => (v/1000)+'k', color: '#898781', font: { size: 10.5 } } },
+        x: { grid: { display: false }, ticks: { color: '#52514e', font: { size: 11 } } }
+      }
+    },
+    plugins: [valueLabelPlugin]
+  });
+
+  const ctxROI = document.getElementById('chartROI').getContext('2d');
+  chartROI = new Chart(ctxROI, {
+    type: 'bar',
+    data: {
+      labels: ['ROI Total', 'ROI Anual'],
+      datasets: [
+        { label: 'Imóvel na Planta', data: [r.roiTotalImovel * 100, r.roiAnualImovel * 100], backgroundColor: '#2a78d6', borderRadius: 4, maxBarThickness: 60, labelFmt: v => v.toFixed(1)+'%' },
+        { label: 'Aplicação Financeira', data: [r.roiTotalAplicacao * 100, r.roiAnualAplicacao * 100], backgroundColor: '#eb6834', borderRadius: 4, maxBarThickness: 60, labelFmt: v => v.toFixed(1)+'%' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11.5 } } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + c.raw.toFixed(2) + '%' } } },
+      scales: {
+        y: { grid: { color: '#e1e0d9' }, ticks: { callback: v => v+'%', color: '#898781', font: { size: 10.5 } } },
+        x: { grid: { display: false }, ticks: { color: '#52514e', font: { size: 11 } } }
+      }
+    },
+    plugins: [valueLabelPlugin]
+  });
+}
+
+document.getElementById('btnCalcular').addEventListener('click', () => {
+  const params = lerParametros();
+  ultimoResultado = calcularSimulacao(params);
+  renderResultados(ultimoResultado);
+});
+
+/* ===================== GERAÇÃO DE PDF ===================== */
+document.getElementById('btnPdf').addEventListener('click', () => {
+  if (!ultimoResultado) return;
+  gerarPDF(ultimoResultado);
+});
+
+function gerarPDF(r) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 40;
+  let y = 50;
+
+  doc.setFillColor(23, 57, 94);
+  doc.rect(0, 0, pageWidth, 90, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(17);
+  doc.text('Análise de Investimento', margin, 38);
+  doc.setFontSize(11.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Imóvel na Planta x Aplicação Financeira', margin, 58);
+  doc.setFontSize(9.5);
+  doc.text('Documento gerado em ' + new Date().toLocaleDateString('pt-BR') + ' — simulação ilustrativa, não constitui recomendação de investimento.', margin, 75);
+
+  y = 118;
+  doc.setTextColor(11, 11, 11);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('Cliente / Investidor:', margin, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(r.params.nomeCliente || 'Não informado', margin + 130, y);
+
+  y += 26;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11.5);
+  doc.text('Premissas utilizadas na simulação', margin, y);
+  y += 8;
+  doc.autoTable({
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 5 },
+    headStyles: { fillColor: [42, 120, 214], textColor: 255, fontStyle: 'bold' },
+    head: [['Valor do imóvel', 'Entrada', 'Parcela mensal', 'Prazo', 'INCC a.a.', 'Valorização do imóvel', 'Rendimento aplicação a.a.']],
+    body: [[
+      fmtRS(r.params.valorImovel),
+      fmtRS(r.valorEntrada) + ' (' + r.params.pctEntrada + '%)',
+      fmtRS(r.params.parcelaMensal),
+      r.params.prazoMeses + ' meses',
+      r.params.inccAnoPct + '% a.a.',
+      r.params.valorizacaoMesPct + '% a.m. (' + r.valorizacaoFinalPct.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '% ao final)',
+      r.params.rendimentoAplicacaoAnoPct + '% a.a.'
+    ]]
+  });
+
+  y = doc.lastAutoTable.finalY + 22;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11.5);
+  doc.text('Correção Monetária (INCC)', margin, y);
+  y += 8;
+  doc.autoTable({
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 9.5, cellPadding: 6 },
+    headStyles: { fillColor: [42, 120, 214], textColor: 255, fontStyle: 'bold' },
+    head: [['Item', 'Valor Nominal (sem correção)', 'Corrigido pelo INCC']],
+    body: [
+      ['Saldo devedor negociado', fmtRS(r.saldoDevedor), fmtRS(r.saldoDevedorCorrigidoINCC)],
+      ['Total investido no imóvel (fluxo real, mês a mês)', fmtRS(r.totalInvestidoNominal), fmtRS(r.valorAplicadoTotal)],
+      ['Total investido no imóvel (todas as parcelas, incl. a 1ª)', fmtRS(r.totalInvestidoNominal), fmtRS(r.valorPagoEntradaINCC)],
+      ['Valor do imóvel a quitar', fmtRS(r.valorAQuitar), fmtRS(r.valorImovelQuitarINCC)]
+    ]
+  });
+
+  y = doc.lastAutoTable.finalY + 22;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11.5);
+  doc.text('Comparativo de Resultados ao Final do Prazo', margin, y);
+  y += 8;
+  doc.autoTable({
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 9.5, cellPadding: 6 },
+    headStyles: { fillColor: [42, 120, 214], textColor: 255, fontStyle: 'bold' },
+    head: [['Indicador', 'Imóvel na Planta', 'Aplicação Financeira']],
+    body: [
+      ['Capital Total Investido', fmtRS(r.capitalInvestidoImovel), fmtRS(r.valorAplicadoTotal)],
+      ['Valor Final do Ativo', fmtRS(r.valorImovelMercado), fmtRS(r.saldoFinalAplicacao)],
+      ['Lucro Líquido', fmtRS(r.lucroImovelTotal), fmtRS(r.lucroOperacaoFinanceira)],
+      ['ROI Total', fmtPct(r.roiTotalImovel), fmtPct(r.roiTotalAplicacao)],
+      ['ROI Anual', fmtPct(r.roiAnualImovel), fmtPct(r.roiAnualAplicacao)]
+    ]
+  });
+
+  y = doc.lastAutoTable.finalY + 20;
+  doc.setFillColor(234, 245, 236);
+  doc.roundedRect(margin, y, pageWidth - margin * 2, 44, 6, 6, 'F');
+  doc.setTextColor(0, 99, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12.5);
+  doc.text('Vantagem do imóvel sobre a aplicação financeira: ' + fmtRS(r.diferencaRS) + ' (' + fmtPct(r.vantagemPct) + ')', margin + 12, y + 27, { maxWidth: pageWidth - margin * 2 - 24 });
+  doc.setTextColor(11, 11, 11);
+
+  // Charts as images
+  y += 60;
+  const imgW = (pageWidth - margin * 2 - 16) / 2;
+  const imgH = imgW * 0.62;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  if (y + imgH > pageHeight - 55) { doc.addPage(); y = 50; }
+  try {
+    const img1 = document.getElementById('chartRS').toDataURL('image/png', 1.0);
+    const img2 = document.getElementById('chartROI').toDataURL('image/png', 1.0);
+    doc.addImage(img1, 'PNG', margin, y, imgW, imgH);
+    doc.addImage(img2, 'PNG', margin + imgW + 16, y, imgW, imgH);
+  } catch (e) { /* charts not rendered yet */ }
+
+  // Page 2: Fluxo de pagamento detalhado
+  doc.addPage();
+  doc.setTextColor(11, 11, 11);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('Fluxo de Pagamento Detalhado — Imóvel na Planta', margin, 46);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Parcela mensal corrigida pelo INCC (estimativa) e balões semestrais corrigidos, mês a mês.', margin, 62);
+
+  const fluxoBody = r.parcelas.map(row => [
+    String(row.mes),
+    fmtRS(row.parcela),
+    (row.balao && Math.abs(row.balao) > 0.005) ? fmtRS(row.balao) : '—',
+    fmtRS(row.total),
+    fmtRS(row.acumulado)
+  ]);
+  doc.autoTable({
+    startY: 74,
+    margin: { left: margin, right: margin },
+    theme: 'striped',
+    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 4 },
+    headStyles: { fillColor: [42, 120, 214], textColor: 255, fontStyle: 'bold' },
+    head: [['Mês', 'Parcela corrigida (INCC)', 'Balão', 'Total do mês', 'Acumulado']],
+    body: fluxoBody,
+    didParseCell: function (data) {
+      if (data.section === 'body' && data.row.raw[2] !== '—') {
+        data.cell.styles.fillColor = [253, 244, 236];
+      }
+    }
+  });
+
+  // Page 3: Simulação aplicação financeira
+  doc.addPage();
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('Simulação Mês a Mês — Aplicação Financeira', margin, 46);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Mesmos aportes do fluxo de parcelas, rendendo no cenário alternativo (IR regressivo sobre o rendimento).', margin, 62);
+
+  const simBody = r.sim.map(row => [
+    String(row.mes),
+    fmtRS(row.saldoAnterior),
+    fmtRS(row.aporte),
+    fmtRS(row.rendimento),
+    fmtPct(row.aliquota),
+    fmtRS(row.descontoIR),
+    fmtRS(row.saldoFinal)
+  ]);
+  doc.autoTable({
+    startY: 74,
+    margin: { left: margin, right: margin },
+    theme: 'striped',
+    styles: { font: 'helvetica', fontSize: 8, cellPadding: 4 },
+    headStyles: { fillColor: [235, 104, 52], textColor: 255, fontStyle: 'bold' },
+    head: [['Mês', 'Saldo Anterior', 'Aporte', 'Rendimento', 'Alíq. IR', 'Desconto IR', 'Saldo Final']],
+    body: simBody
+  });
+
+  // Page 4: Financiamento do saldo na entrega (PRICE x SAC) — só se o usuário já calculou
+  if (ultimoFinanciamento) {
+    const f = ultimoFinanciamento;
+    doc.addPage();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Financiamento do Saldo Devedor na Entrega — PRICE x SAC', margin, 46);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Financiamento bancário do valor a quitar (corrigido pelo INCC), prazo de ' + f.prazoMeses + ' meses a ' + f.taxaMensal + '% a.m.', margin, 62);
+
+    doc.autoTable({
+      startY: 74,
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 9, cellPadding: 5 },
+      headStyles: { fillColor: [42, 120, 214], textColor: 255, fontStyle: 'bold' },
+      head: [['Entrada (INCC)', 'Valor do Imóvel', 'Valor Financiado', 'Prazo', 'Taxa de Juros']],
+      body: [[fmtRS(f.entrada), fmtRS(f.valorImovel), fmtRS(f.principal), f.prazoMeses + ' meses', f.taxaMensal + '% a.m.']]
+    });
+
+    let yFin = doc.lastAutoTable.finalY + 20;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11.5);
+    doc.text('Comparativo PRICE x SAC', margin, yFin);
+    yFin += 8;
+    doc.autoTable({
+      startY: yFin,
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 9.5, cellPadding: 6 },
+      headStyles: { fillColor: [42, 120, 214], textColor: 255, fontStyle: 'bold' },
+      head: [['Indicador', 'PRICE', 'SAC']],
+      body: [
+        ['Parcela inicial', fmtRS(f.price.parcelaInicial), fmtRS(f.sac.parcelaInicial)],
+        ['Parcela final', fmtRS(f.price.parcelaFinal), fmtRS(f.sac.parcelaFinal)],
+        ['Total pago (juros + amortização)', fmtRS(f.price.totalPago), fmtRS(f.sac.totalPago)],
+        ['Total de juros pago', fmtRS(f.price.totalJuros), fmtRS(f.sac.totalJuros)]
+      ]
+    });
+
+    yFin = doc.lastAutoTable.finalY + 20;
+    const finImgW = pageWidth - margin * 2;
+    const finImgH = finImgW * 0.35;
+    if (yFin + finImgH > pageHeight - 55) { doc.addPage(); yFin = 50; }
+    try {
+      const imgFin = document.getElementById('chartFinanciamento').toDataURL('image/png', 1.0);
+      doc.addImage(imgFin, 'PNG', margin, yFin, finImgW, finImgH);
+    } catch (e) { /* chart not rendered */ }
+
+    // Tabela de amortização detalhada do sistema ativo na tela
+    doc.addPage();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Tabela de Amortização Detalhada — Sistema ' + sistemaFinanciamentoAtivo, margin, 46);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Mês a mês: saldo devedor, juros, amortização e parcela.', margin, 62);
+
+    const tabelaAtiva = sistemaFinanciamentoAtivo === 'PRICE' ? f.price.tabela : f.sac.tabela;
+    const finBody = tabelaAtiva.map(row => [
+      String(row.mes),
+      fmtRS(row.saldoDevedor),
+      fmtRS(row.juros),
+      fmtRS(row.amortizacao),
+      fmtRS(row.parcela)
+    ]);
+    doc.autoTable({
+      startY: 74,
+      margin: { left: margin, right: margin },
+      theme: 'striped',
+      styles: { font: 'helvetica', fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: sistemaFinanciamentoAtivo === 'PRICE' ? [42, 120, 214] : [235, 104, 52], textColor: 255, fontStyle: 'bold' },
+      head: [['Mês', 'Saldo Devedor', 'Juros', 'Amortização', 'Parcela']],
+      body: finBody
+    });
+  }
+
+  // Footer disclaimer on every page
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7.5);
+    doc.setTextColor(137, 135, 129);
+    doc.text('Simulação ilustrativa baseada em premissas informadas pelo usuário. Não constitui recomendação de investimento. Página ' + i + ' de ' + pageCount, margin, doc.internal.pageSize.getHeight() - 20);
+  }
+
+  const nomeArquivo = 'Simulacao_Investimento' + (r.params.nomeCliente ? '_' + r.params.nomeCliente.replace(/[^a-zA-Z0-9]+/g, '_') : '') + '.pdf';
+  doc.save(nomeArquivo);
+}
+</script>
+</body>
+</html>
